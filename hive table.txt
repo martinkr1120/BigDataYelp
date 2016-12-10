@@ -1,0 +1,50 @@
+CREATE EXTERNAL TABLE IF NOT EXISTS SearchIndex(
+        business_id STRING, 
+        latitude DOUBLE,
+        longitude DOUBLE,
+        avg_stars INT,
+        review_count INT,
+        avg_stars_month_1 INT, 
+        review_count_month_2 INT,
+        avg_stars_month_2 INT, 
+        review_count_month_3 INT,
+        avg_stars_month_3 INT, 
+        review_count_month_4 INT,
+        avg_stars_month_4 INT, 
+        review_count_month_5 INT,
+        avg_stars_month_5 INT, 
+        review_count_month_6 INT,
+        avg_stars_month_6 INT, 
+        review_count_month_7 INT,
+        avg_stars_month_7 INT, 
+        review_count_month_8 INT,
+        avg_stars_month_8 INT, 
+        review_count_month_9 INT,
+        avg_stars_month_9 INT, 
+        review_count_month_10 INT,
+        avg_stars_month_10 INT, 
+        review_count_month_11 INT,
+        avg_stars_month_11 INT, 
+        review_count_month_12 INT,
+        avg_stars_month_12 INT
+        )
+    COMMENT 'Searchin index for business id by latitude,longitude'
+    ROW FORMAT DELIMITED
+    FIELDS TERMINATED BY ','
+    STORED AS TEXTFILE
+    location '<location to your output folder in HDFS>/searchIndexForBusiness';
+
+CREATE EXTERNAL TABLE IF NOT EXISTS BusinessIndex(
+        business_id STRING, 
+        detail STRING
+        )
+    COMMENT 'Searchin index for business json by latitude,longitude'
+    ROW FORMAT DELIMITED
+    FIELDS TERMINATED BY '\t'
+    STORED AS TEXTFILE
+    location '<location to your output folder in HDFS>/businessDetail';
+
+CREATE EXTERNAL TABLE IF NOT EXISTS positive_review(business_id STRING,data STRING) COMMENT 'Search for specific specific reviews by business id' ROW FORMAT DELIMITED FIELDS TERMINATED BY '\t' LINES TERMINATED BY '\n' STORED AS TEXTFILE LOCATION '<location to your output folder in HDFS>/positive_review';
+
+
+CREATE EXTERNAL TABLE IF NOT EXISTS negative_review(business_id STRING,data STRING) COMMENT 'Search for specific one specific review id by business id' ROW FORMAT DELIMITED FIELDS TERMINATED BY '\t' LINES TERMINATED BY '\n' STORED AS TEXTFILE LOCATION '<location to your output folder in HDFS>/negaive_review';

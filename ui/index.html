@@ -1,0 +1,673 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>PLEY</title>
+
+    <link href="http://cdn.bootcss.com/normalize/4.2.0/normalize.css" rel="stylesheet">
+    <link href="http://cdn.bootcss.com/bootstrap/3.3.5/css/bootstrap.css" rel="stylesheet">
+    <link href="http://cdn.bootcss.com/bootstrap/3.3.5/css/bootstrap-theme.css" rel="stylesheet">
+    <script src="http://cdn.bootcss.com/jquery/1.11.3/jquery.js"></script>
+    <script src="http://cdn.bootcss.com/moment.js/2.14.1/moment.min.js"></script>
+    <script src="http://cdn.bootcss.com/bootstrap/3.3.5/js/bootstrap.js"></script>
+
+    <link href="http://cdn.bootcss.com/bootstrap-datetimepicker/4.17.37/css/bootstrap-datetimepicker.css"
+          rel="stylesheet">
+    <script src="http://cdn.bootcss.com/bootstrap-datetimepicker/4.17.37/js/bootstrap-datetimepicker.min.js"></script>
+
+    <script src="http://maps.googleapis.com/maps/api/js?key=AIzaSyCmvNcsgphWKNcnL7-WS7kK34D3BBoq_j8"></script>
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+</head>
+
+<script type="text/javascript">
+    //var isStop = true;
+
+    var socket = null;
+    var isopen = false;
+    var firstBusiness = true;
+    var isBusiness = false;
+    var isNegReview = false;
+    var isPosReview = false;
+
+    initialize = function () {
+        try {
+            socket = new WebSocket("ws://0.0.0.0:9998");
+
+            socket.onopen = function () {
+                console.log("Connected!");
+                isopen = true;
+            }
+
+            socket.onmessage = function (e) {
+                var json_data = e.data;
+                if (json_data == "negative") {
+                    console.log("get negative signal---------------")
+                    isNegReview = true;
+                    isPosReview = false;
+                    isBusiness = false;
+                    return;
+                }
+                else if (json_data == "positive") {
+                    console.log("get positive signal---------------")
+                    isPosReview = true;
+                    isNegReview = false;
+                    isBusiness = false;
+                    return;
+                } else if (json_data == "bus") {
+                    console.log("get business signal---------------")
+                    isBusiness = true;
+                    isPosReview = false;
+                    isNegReview = false;
+                    return;
+                }
+                if (isNegReview) {
+                    console.log("getting negative reviews---------------")
+                    var obj = JSON.parse(json_data);
+                    $("#negative").append("Date:  " + obj.date + "<br>");
+                    $("#negative").append("Stars:  " + obj.stars + "<br>");
+                    $("#negative").append(obj.text);
+                    $("#negative").append("<hr>");
+                } else if (isPosReview) {
+                    console.log("getting positive reviews---------------")
+                    var obj = JSON.parse(json_data);
+                    $("#positive").append("Date:  " + obj.date + "<br>");
+                    $("#positive").append("Stars:  " + obj.stars + "<br>");
+                    $("#positive").append(obj.text);
+                    $("#positive").append("<hr>");
+                } else {
+                    var json_obj = JSON.parse(json_data);
+                    var categories = json_obj.categories;
+                    var business_id = json_obj.business_id;
+
+                    localStorage.setItem(business_id, json_data);
+                    if (localStorage.getItem("cate:all") == null) {
+                        localStorage.setItem("cate:all", business_id);
+                    }
+                    else {
+                        localStorage.setItem("cate:all", localStorage.getItem("cate:all") + "," + business_id);
+                    }
+                    for (var i = 0; i < categories.length; i++) {
+                        var bids;
+                        if (localStorage.getItem("cate:" + categories[i]) == null) {
+                            bids = json_obj.business_id;
+                            $('#categorys_options').append(
+                                    $("<option></option>").attr("value", categories[i]).text(categories[i])
+                            );
+                        }
+                        else {
+                            bids = localStorage.getItem("cate:" + categories[i]) + "," + business_id;
+                        }
+                        localStorage.setItem("cate:" + categories[i], bids);
+                    }
+
+                    renderTable(json_data);
+                    if (firstBusiness) {
+                        renderBusinessDetail(JSON.parse(json_data));
+                        firstBusiness = false;
+                    }
+                }
+            }
+
+            socket.onclose = function (e) {
+                console.log("Connection closed.");
+                socket = null;
+                isopen = false;
+            }
+
+        } catch (e) {
+            alert("getUserMedia error " + e);
+            //trace_e(e, "getUserMedia error");
+        }
+    }
+
+    setTimeout(initialize, 1);
+
+    function findNearbyNodes(radius, latitude, longitude) {
+        var latRange = radius * 20 / 69111;
+        var lonRange = radius * 20 / (69111 * Math.abs(Math.cos(latitude)));
+        var latitudeMin = latitude - latRange;
+        var latitudeMax = latitude + latRange;
+        var longitudeMin = longitude - lonRange;
+        var longitudeMax = longitude + lonRange;
+        latitudeMax = latitudeMax > 90 ? 90 : latitudeMax;
+        latitudeMin = latitudeMin < -90 ? -90 : latitudeMin;
+        longitudeMax = longitudeMax > 180 ? 180 : longitudeMax;
+        longitudeMin = longitudeMin < -180 ? -180 : longitudeMin;
+        return latitudeMin + "," + latitudeMax + "," + longitudeMin + "," + longitudeMax;
+    }
+
+
+</script>
+<style>
+    * {
+        box-sizing: border-box;
+        margin: 0;
+    }
+
+    html, body {
+        height: 100%;
+        margin: 0;
+        padding: 0;
+        color: #faf2cc;
+    }
+
+    .wrapper {
+        min-height: 100%;
+        background-color: #3c3c3c;
+    }
+
+    h1 {
+        margin: 0;
+        padding: 0;
+        font-size: 10vh;
+    }
+
+    .title {
+        position: relative;
+        top: 20vh;
+        text-align: center;
+    }
+
+    .input {
+        position: absolute;
+        top: 50vh;
+        left: 37vw;
+    }
+
+    .picker {
+        position: absolute;
+        top: 40vh;
+        left: 37vw;
+        width: 26vw;
+        color: seagreen;
+    }
+
+    .field {
+        float: left;
+        width: 26vw;
+    }
+
+    .box {
+        #display: inline-block;
+        float: left;
+        height: 92vh;
+        width: 50vw;
+        border-top-style: solid;
+        border-top-color: #d5d5d5;
+        border-width: 1px;
+    }
+
+    .map {
+        padding-bottom: 92vh;
+    }
+
+    .canscroll {
+        overflow: scroll;
+    }
+
+    .head {
+        display: inline-block;
+        margin: 0;
+        height: 10%;
+        padding: 1%;
+    }
+
+    .choosing {
+        width: 100%;
+        height: 50%;
+        margin: 0;
+        border: 1px solid white;
+        #display: inline-block;
+
+    }
+
+    th {
+        color: #761c19;
+        background-color: #f9f2f4;
+    }
+
+    table, th, td {
+        border: 1px solid black;
+    }
+
+    tr:nth-child(even) {
+        background-color: #5e5e5e;
+    }
+
+    tr:hover {
+        background-color: #843534;
+        color: white;
+        #color: lightcoral;
+    }
+
+    #infobox {
+        #background-color: #d9534f;
+        color: #b92c28;
+    }
+
+    h3, hr {
+        margin: 3px;
+    }
+
+    .imgs {
+        width: 50%;
+        height: 100%;
+        float: left;
+    }
+
+    .review_link {
+        color: #28a4c9;
+        display: inline-block;
+    }
+
+    .review_link:hover {
+        color: chartreuse;
+    }
+
+    .review_link:visited {
+        color: tomato;
+    }
+
+    .modalSize {
+        width: 85vw;
+        height: 90vh;
+        color: black;
+        overflow: scroll;
+    }
+
+    .review {
+        float: left;
+        box-sizing: border-box;
+        height: 80%;
+        width: 48%;
+        overflow: scroll;
+        border: 2px solid black;
+    }
+
+    hr {
+        height: 3vh;
+        color: #0f0f0f;
+        background-color: #0f0f0f;
+    }
+
+    .head2 {
+        float: left;
+    }
+
+    #categorys_options {
+        position: absolute;
+        top: 5vh;
+        #bottom: 0vh;
+        left: 50vw;
+        clear: right;
+        color: #761c19;
+    }
+    #list_table {
+        margin:0;
+    }
+
+</style>
+
+<body>
+<!--
+<button type="button" class="btn btn-primary" data-toggle="modal" data-target=".bs-example-modal-lg">Large modal
+</button>
+-->
+<div class="modal fade bs-example-modal-lg" tabindex="-1" role="dialog" aria-labelledby="myLargeModalLabel">
+    <div class="modal-dialog modal-lg" role="document">
+        <div class="modal-content modalSize">
+            <div class="modal-header">
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span
+                        aria-hidden="true">&times;</span></button>
+                <h4 class="modal-title" id="gridSystemModalLabel">Reviews</h4>
+            </div>
+            <div class="modal-body">
+                <div id="neg-box" class="review">
+                    <h3>Negative Review</h3>
+                    <hr>
+                    <div id="negative">
+
+                    </div>
+                </div>
+                <div id="pos-box" class="review">
+                    <h3>Positive Review</h3>
+                    <hr>
+                    <div id="positive">
+
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="page1" class="wrapper">
+    <div class="title">
+        <h1>PLEY</h1>
+    </div>
+
+    <div class="form-group has-error input">
+        <input type="text" class="form-control field" id="input_target" aria-describedby="helpBlock2"
+               placeholder="Any Location">
+        <button id="submit" type="button" class="btn btn-success">Go</button>
+    </div>
+
+    <div class="picker">
+        <div class='input-group date' id='datetimepicker1'>
+            <input type='text' class="form-control"/>
+            <span class="input-group-addon">
+                        <span class="glyphicon glyphicon-calendar"></span>
+                    </span>
+        </div>
+    </div>
+
+</div>
+
+<div id="page2" class="wrapper">
+    <div>
+        <h2 class="head">PLEY</h2>
+        <select name="categorys" id="categorys_options">
+            <option value="all">All</option>
+        </select>
+    </div>
+
+
+    <div id="sample" class="map box"></div>
+    <div class="box">
+        <div id="detail" class="choosing canscroll">
+        </div>
+        <div id="list_div" class="canscroll choosing">
+            <table id="list_table" class="table table-condensed">
+                <thead>
+                <tr>
+                    <th>name</th>
+                    <th>full address</th>
+                    <th>stars</th>
+                    <th>review count</th>
+                    <th>categories</th>
+                    <th>open</th>
+                </tr>
+                </thead>
+            </table>
+        </div>
+    </div>
+</div>
+
+<input id="flag" type="hidden" checked="true">
+<button id="flagg" type="button" style="display: none" onclick="this.style.display = 'none'"></button>
+
+
+</body>
+<script type="text/javascript">
+    var map;
+    var instance = $(".map")[0];
+    var markers = [];
+
+    var target_address;
+    var target_url;
+    var target_lat = '';
+    var target_lng = '';
+    var formatted_addr = '';
+    var business_count = 0;
+    var bounds;
+
+    $(document).ready(function () {
+        $("#page2").hide();
+    });
+
+    $(function () {
+        var thisDate = Date.now();
+        $('#datetimepicker1').datetimepicker({
+            format: 'MM/DD/YYYY',
+            minDate: thisDate
+        });
+    });
+
+    $("#submit").click(function () {
+        bounds = new google.maps.LatLngBounds();
+
+        //business_count = 0;
+        localStorage.clear();
+
+
+        target_address = $("#input_target").val();
+        target_url = "https://maps.googleapis.com/maps/api/geocode/json?address=" + target_address.replace(/\s+/g, "+") + "&key=AIzaSyCmvNcsgphWKNcnL7-WS7kK34D3BBoq_j8"
+        $.ajax({
+            url: target_url, async: false, success: function (data) {
+                target_lat = data.results[0].geometry.location.lat;
+                target_lng = data.results[0].geometry.location.lng;
+                formatted_addr = data.results[0].formatted_address;
+                //alert(target_lat + "      " + target_lng + "     " + formatted_addr);
+            }
+        });
+
+        var tmp = findNearbyNodes(1, target_lat, target_lng) + ",6";
+        console.log(tmp);
+        socket.send(tmp);
+
+        $("#page1").hide("slow");
+        $("#page2").fadeIn(2000);
+
+        $("#flagg").trigger("click");
+    })
+
+
+    var sign = document.getElementById("flagg");
+    google.maps.event.addDomListener(sign, 'click', loadMap);
+
+    function renderTable(json) {
+        var json_obj = JSON.parse(json);
+        var name = json_obj.name;
+        var addr = json_obj.full_address;
+        var stars = json_obj.stars;
+        var review_count = json_obj.review_count;
+        var categories = json_obj.categories;
+        var business_id = json_obj.business_id;
+        var open = json_obj.open;
+        //var d = new Date().getDay();
+        var day = json_obj.hours;
+        var hours;
+
+        var lat = json_obj.latitude;
+        var lng = json_obj.longitude;
+
+        getMarker(lat, lng, name, business_id);
+
+        var str = "<tr id='row-" + business_id + "'>" + "<td>" + name + "</td>"
+                + "<td>" + addr + "</td>"
+                + "<td>" + stars + "</td>"
+                + "<td>" + review_count + "</td>"
+                + "<td>" + categories + "</td>"
+                + "<td>" + open + "</td>"
+                + "</tr>";
+
+        $("#list_table").append(str);
+
+        $("#row-" + business_id).click((function (business_id) {
+            return function () {
+                $("#positive").text("");
+                renderBusinessDetail(json_obj);
+            }
+        })(business_id));
+    }
+
+    function renderBusinessDetail(json_obj) {
+        //return function () {
+        var detail = "<h3 style='display: inline-block'>" + json_obj.name + "</h3><a data-toggle='modal' data-target='.bs-example-modal-lg' class='review_link' href='#'>reviews here</a>" + "<hr>" + "";
+        var obj = json_obj.attributes;
+        if (obj == null || obj == undefined || obj.length == 0)
+            return;
+
+        var res = JSON.stringify(obj, null, '\t').replace(/,|\"|{|}|true|false/gi, function myFunction(x) {
+            if (x == "false")
+                return "No";
+            else if (x == "true") return "Yes";
+            else return "";
+        });
+        $("#detail").text("");
+        $("#detail").append(detail);
+
+        var bid = json_obj.business_id;
+
+        $.getJSON("./photo_id_to_business_id.json").done(function (json_obj) {
+            var hasImg = false;
+            $.each(json_obj, function (index, field) {
+                //alert(field.photo_id + "***" + field.business_id);
+                //alert(bid);
+                if (field.business_id == bid) {
+                    var img_path = "./images/" + field.photo_id + ".jpg";
+                    //alert(field.business_id);
+                    $("#detail").append("<img class='imgs' src='" + img_path + "'>");
+                    hasImg = true;
+                }
+            });
+            if (!hasImg) {
+                $("#detail").append("<h2>Sorry, No Images In this Business</h2>");
+            }
+            if (res.length == 0)
+                $("#detail").append("<pre><h3 style='clear:left'>OOPS~~~ No Features Described Here</h3></pre>");
+            else
+                $("#detail").append("<pre style='clear:left'>" + res + "</pre>");
+        }).fail(function(){
+            $("#detail").append("<h2>Sorry, No Images In this Business, Resources are not available</h2>");
+            if (res.length == 0)
+                $("#detail").append("<pre><h3 style='clear:left'>OOPS~~~ No Features Described Here</h3></pre>");
+            else
+                $("#detail").append("<pre style='clear:left'>" + res + "</pre>");
+        });
+
+        // $.getJSON("./photo_id_to_business_id.json", function (json_obj) {
+        //     var hasImg = false;
+        //     $.each(json_obj, function (index, field) {
+        //         //alert(field.photo_id + "***" + field.business_id);
+        //         //alert(bid);
+        //         if (field.business_id == bid) {
+        //             var img_path = "./images/" + field.photo_id + ".jpg";
+        //             //alert(field.business_id);
+        //             $("#detail").append("<img class='imgs' src='" + img_path + "'>");
+        //             hasImg = true;
+        //         }
+        //     });
+        //     if (!hasImg) {
+        //         $("#detail").append("<h2>Sorry, No Images In this Business</h2>");
+        //     }
+        //     if (res.length == 0)
+        //         $("#detail").append("<pre><h3 style='clear:left'>OOPS~~~ No Features Described Here</h3></pre>");
+        //     else
+        //         $("#detail").append("<pre style='clear:left'>" + res + "</pre>");
+        // });
+
+
+
+        $(".review_link").click(function () {
+            socket.send("review:" + bid);
+        })
+    }
+
+    function getMarker(lat, lng, name, index) {
+
+        var latlng = new google.maps.LatLng(lat, lng);
+
+        var marker = new google.maps.Marker({
+            position: latlng,
+            map: map,
+            icon: {
+                path: google.maps.SymbolPath.FORWARD_CLOSED_ARROW,//google.maps.SymbolPath.CIRCLE,
+                scale: 3,
+                strokeWeight: 4,
+                strokeColor: "crimson"    //"#42A329"
+            }
+        });
+
+        markers.push(marker);
+
+        var id = "#row-" + index;
+        $(id).mouseover((function (marker) {
+            return function () {
+                document.body.style.cursor = 'pointer';
+                google.maps.event.trigger(marker, "mouseover");
+            }
+        })(marker));
+
+
+        $(id).mouseout((function (marker) {
+            return function () {
+                document.body.style.cursor = 'default';
+                google.maps.event.trigger(marker, "mouseout");
+            }
+        })(marker));
+
+        var area = new google.maps.Circle({
+            center: marker.position,
+            radius: map.getZoom(),
+
+            strokeColor: "#B5DB9B",
+            strokeOpacity: 0.6,
+            strokeWeight: 2,
+
+            fillColor: "#d9534f",
+            fillOpacity: 0.6
+        });
+
+        var infowindow = new google.maps.InfoWindow({
+            content: "<div id='infobox'><b>" + name + "</b></div>"
+        });
+
+        google.maps.event.addListener(marker, 'mouseover', (function (marker, area, infowindow) {
+            return function () {
+                infowindow.open(map, marker);
+                marker.setAnimation(google.maps.Animation.BOUNCE);
+                area.setMap(map);
+            }
+        })(marker, area, infowindow));
+
+        google.maps.event.addListener(marker, 'mouseout', (function (marker, area, infowindow) {
+            return function () {
+                infowindow.close();
+                marker.setAnimation(google.maps.Animation.Drop);
+                area.setMap(null);
+            }
+        })(marker, area, infowindow));
+        marker.setAnimation(google.maps.Animation.BOUNCE);
+        setTimeout(function () {
+            marker.setAnimation(null);
+        }, 750);
+        bounds.extend(latlng);
+        map.fitBounds(bounds);
+    }
+
+    function loadMap() {
+        var mapOptions = {
+            center: new google.maps.LatLng(target_lat, target_lng),
+            zoom: 7
+        }
+
+        map = new google.maps.Map(instance, mapOptions);
+
+        var target_marker = new google.maps.Marker({
+            position: new google.maps.LatLng(target_lat, target_lng),
+            map: map
+        });
+
+        var target_infowindow = new google.maps.InfoWindow({
+            content: "<div id='infobox'><b>" + formatted_addr + "</b></div>"
+        });
+        target_infowindow.open(map, target_marker);
+    }
+    $('#categorys_options').on('change', function () {
+        var list = localStorage.getItem("cate:" + this.value).split(",");
+        for (var i = 0; i < markers.length; i++) {
+            markers[i].setMap(null);
+        }
+        markers = [];
+        $('#list_table').find($("tr")).remove();
+        console.log(list.length);
+        for (var i = 0; i < list.length; i++) {
+            renderTable(localStorage.getItem(list[i]));
+        }
+    });
+
+
+</script>
+
+
+</html>
